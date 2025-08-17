@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: authentication
+
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/auth_service
