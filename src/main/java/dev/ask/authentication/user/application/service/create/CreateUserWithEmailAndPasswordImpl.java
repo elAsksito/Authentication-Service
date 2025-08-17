@@ -1,10 +1,14 @@
 package dev.ask.authentication.user.application.service.create;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import dev.ask.authentication.audit_log.domain.enums.Actions;
+import dev.ask.authentication.audit_log.domain.model.AuditLog;
+import dev.ask.authentication.audit_log.domain.service.create.CreateAuditLog;
 import dev.ask.authentication.password_history.domain.service.create.CreatePasswordHistory;
 import dev.ask.authentication.user.application.vo.Email;
 import dev.ask.authentication.user.application.vo.Password;
@@ -22,6 +26,7 @@ public class CreateUserWithEmailAndPasswordImpl implements CreateUserWithEmailAn
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final CreatePasswordHistory createPasswordHistory;
+    private final CreateAuditLog createAuditLog;
     
     @Override
     public Mono<User> createUserWithEmailAndPassword(String email, String password, String ipAddress, String userAgent) {
@@ -44,8 +49,33 @@ public class CreateUserWithEmailAndPasswordImpl implements CreateUserWithEmailAn
                 return userRepository.save(user)
                     .flatMap(savedUser ->
                         createPasswordHistory.createPasswordHistory(savedUser.getId(), encodedPassword)
+                            .then(createAuditLog.createAuditLog(
+                                AuditLog.builder()
+                                .userId(savedUser.getId())
+                                .action(Actions.REGISTER_SUCCESS)
+                                .metadata(Map.of(
+                                    "email", userEmail.value(),
+                                    "action", Actions.REGISTER_SUCCESS.toString(),
+                                    "ipAddress", ipAddress,
+                                    "userAgent", userAgent
+                                ))
+                                .build()
+                            ))
                             .thenReturn(savedUser));
-            }));
+            }))
+            .onErrorResume(ex ->
+                createAuditLog.createAuditLog(AuditLog.builder()
+                                .userId(null)
+                                .action(Actions.REGISTER_FAILED)
+                                .metadata(Map.of(
+                                    "email", userEmail.value(),
+                                    "action", Actions.REGISTER_FAILED.toString(),
+                                    "ipAddress", ipAddress,
+                                    "userAgent", userAgent
+                                ))
+                                .build()
+                            ).then(Mono.error(ex))
+                        );
     }
     
 }
