@@ -23,8 +23,6 @@ public class RegisterHandler {
                 .flatMap(req -> 
                     createWithEmail.createUserWithEmailAndPassword(req.getEmail(), req.getPassword(), ipAddress, userAgent))
                 .flatMap(user -> 
-                    ServerResponse.ok().bodyValue("Registro exitoso"))
-                .onErrorResume(e -> 
-                    ServerResponse.badRequest().bodyValue(e.getMessage()));
+                    ServerResponse.ok().bodyValue("Registro exitoso"));
     }
 }
